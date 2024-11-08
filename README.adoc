@@ -80,7 +80,7 @@ If you are in China you may encounter network issues or proxy settings. That's o
 
 The only requirements to run OFBiz is
 
-* to have the Java Development Kit (JDK) version 8 installed on your system
+* to have the Java Development Kit (JDK) version 11 installed on your system
 (not just the JRE, but the full JDK) that you can download from the below link.
 Make sure of setting the $JAVA_HOME environment variable. +
 
