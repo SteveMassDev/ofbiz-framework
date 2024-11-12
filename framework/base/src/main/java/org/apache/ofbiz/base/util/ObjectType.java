@@ -21,6 +21,7 @@ package org.apache.ofbiz.base.util;
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -156,7 +157,7 @@ public class ObjectType {
      * @throws ClassNotFoundException
      * @throws InstantiationException
      * @throws IllegalAccessException
-     * @throws NoSuchMethodException 
+     * @throws NoSuchMethodException
      * @throws InvocationTargetException
      */
     public static Object getInstance(String className) throws ClassNotFoundException, InstantiationException,
@@ -559,6 +560,12 @@ public class ObjectType {
         }
 
         if (converter != null) {
+            // numeric types : replace everything that's not in [:IsAlnum:] or [:IsPunct:] classes by an empty string
+            List<?> numericClasses = UtilMisc.toList(BigDecimal.class, Double.class, Float.class, Long.class);
+            if (obj instanceof String && numericClasses.contains(targetClass)) {
+                obj = ((String) obj).replaceAll("[^\\p{IsAlnum}\\p{IsPunct}]", "");
+            }
+
             if (converter instanceof LocalizedConverter) {
                 @SuppressWarnings("rawtypes")
                 LocalizedConverter<Object, Object> localizedConverter = (LocalizedConverter) converter;
