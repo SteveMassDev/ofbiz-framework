@@ -145,7 +145,7 @@ public class ControlFilter implements Filter {
             if (queryString != null) {
                 queryString = URLDecoder.decode(queryString, "UTF-8");
                 if (UtilValidate.isUrl(queryString)
-                        || !SecuredUpload.isValidText(queryString, SecuredUpload.getallowedTokens(), true)
+                        || !SecuredUpload.isValidText(queryString.toLowerCase(), SecuredUpload.getallowedTokens(), true)
                         && isSolrTest()) {
                     Debug.logError("For security reason this URL is not accepted", module);
                     throw new RuntimeException("For security reason this URL is not accepted");

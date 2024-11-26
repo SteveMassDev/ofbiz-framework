@@ -40,7 +40,6 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -52,7 +51,7 @@ import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 
-import org.apache.batik.dom.svg.SAXSVGDocumentFactory;
+import org.apache.batik.anim.dom.SAXSVGDocumentFactory;
 import org.apache.batik.util.XMLResourceDescriptor;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -98,7 +97,7 @@ import com.lowagie.text.pdf.PdfReader;
 
 public class SecuredUpload {
 
-    // To check if a webshell is not uploaded
+    // To check if a webshell is not uploaded or a reverse shell put in the query string
 
     // This can be helpful:
     // https://en.wikipedia.org/wiki/File_format
@@ -120,46 +119,41 @@ public class SecuredUpload {
      * @return
      * @throws IOException
      */
-    public static boolean isValidEncodedText(String content, List<String> allowed) throws IOException {
+    public static boolean isNotValidEncodedText(String content, List<String> allowed) throws IOException {
         try {
-            return !isValidText(Base64.getDecoder().decode(content).toString(), allowed, false)
-                    || !isValidText(Base64.getMimeDecoder().decode(content).toString(), allowed, false)
-                    || !isValidText(Base64.getUrlDecoder().decode(content).toString(), allowed, false);
+            return isValidText(new String(Base64.getDecoder().decode(content), StandardCharsets.UTF_8), allowed);
         } catch (IllegalArgumentException e) {
             // the encoded text isn't a Base64, allow it because there is no security risk
-            return true;
+            return false;
         }
     }
 
     // Cover method of the same name below. Historically used with 84 references when below was created
-    // This is used for checking there is no web shell in an uploaded file
+    // check there is no web shell in the uploaded file
+    // A file containing a reverse shell will be rejected.
     public static boolean isValidText(String content, List<String> allowed) throws IOException {
         return isValidText(content, allowed, false);
     }
 
-    public static boolean isValidText(String content, List<String> allowed, boolean testEncodeContent) throws IOException {
+    public static boolean isValidText(String content, List<String> allowed, boolean isQuery) throws IOException {
         if (content == null) {
             return false;
         }
-        if (!testEncodeContent) {
+        if (!isQuery) {
             String contentWithoutSpaces = content.replaceAll(" ", "");
             if ((contentWithoutSpaces.contains("\"+\"") || contentWithoutSpaces.contains("'+'"))
                     && !ALLOWSTRINGCONCATENATIONINUPLOADEDFILES) {
                 Debug.logInfo("The uploaded file contains a string concatenation. It can't be uploaded for security reason", MODULE);
                 return false;
             }
-        }
-        // This is used for checking there is no reverse shell in a query string
-        if (testEncodeContent && !isValidEncodedText(content, allowed)) {
-            return false;
-        } else if (testEncodeContent) {
-            // e.g. split parameters of an at all non encoded  HTTP query string
+        } else {
+            // Check the query string is safe, notably no reverse shell
             List<String> queryParameters = StringUtil.split(content, "&");
-            return DENIEDWEBSHELLTOKENS.stream().allMatch(token -> isValid(queryParameters, token, allowed));
+            return DENIEDWEBSHELLTOKENS.stream().allMatch(token -> isValid(queryParameters, token.toLowerCase(), allowed));
         }
 
-        // This is used for checking there is no web shell in an uploaded file
-        return DENIEDWEBSHELLTOKENS.stream().allMatch(token -> isValid(content, token.toLowerCase(), allowed));
+        // Check there is no web shell in an uploaded file
+        return DENIEDWEBSHELLTOKENS.stream().allMatch(token -> isValid(content.toLowerCase(), token.toLowerCase(), allowed));
     }
 
     public static boolean isValidFileName(String fileToCheck, Delegator delegator) throws IOException {
@@ -451,7 +445,7 @@ public class SecuredUpload {
                     default:
                         throw new IOException("Format of the original image " + fileName + " is not supported for write operation !");
                     }
-                    imageParser.writeImage(sanitizedImage, fos, new HashMap<>());
+                    imageParser.writeImage(sanitizedImage, fos, null);
                 }
                 // Set state flag
                 safeState = true;
@@ -505,7 +499,7 @@ public class SecuredUpload {
                 return false;
             }
             // Load stream in PDF parser
-            PdfReader reader = new PdfReader(file.getAbsolutePath());
+            new PdfReader(file.getAbsolutePath());
             return true;
         } catch (Exception e) {
             return false;
@@ -802,21 +796,22 @@ public class SecuredUpload {
         return isValidText(content, allowed);
     }
 
-    // This is used for checking there is no web shell
+    // Check there is no web shell
     private static boolean isValid(String content, String string, List<String> allowed) {
-        boolean isOK = !content.toLowerCase().contains(string) || allowed.contains(string);
+        boolean isOK = !content.contains(string) || allowed.contains(string);
         if (!isOK) {
             Debug.logInfo("The uploaded file contains the string '" + string + "'. It can't be uploaded for security reason", MODULE);
         }
         return isOK;
     }
 
-    // This is used for checking there is no reverse shell
+    // Check there is no reverse shell in query string
     private static boolean isValid(List<String> queryParameters, String string, List<String> allowed) {
         boolean isOK = true;
+
         for (String parameter : queryParameters) {
-            if (!HashCrypt.cryptBytes("SHA", "OFBiz", parameter.getBytes(StandardCharsets.UTF_8)).contains(string)
-                    || allowed.contains(HashCrypt.cryptBytes("SHA", "OFBiz", parameter.getBytes(StandardCharsets.UTF_8)))) {
+            if (!parameter.contains(string)
+                    || allowed.contains(HashCrypt.cryptBytes("SHA", "OFBiz", parameter.toLowerCase().getBytes(StandardCharsets.UTF_8)))) {
                 continue;
             } else {
                 isOK = false;
