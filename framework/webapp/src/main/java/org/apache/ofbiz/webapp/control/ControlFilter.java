@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -141,17 +142,18 @@ public class ControlFilter implements Filter {
             String requestUri = httpRequest.getRequestURI().substring(httpRequest.getContextPath().length());
 
             // Reject wrong URLs
+            if (!requestUri.matches("/control/logout;jsessionid=[A-Z0-9]{32}\\.jvm1")) {
             String queryString = httpRequest.getQueryString();
             if (queryString != null) {
                 queryString = URLDecoder.decode(queryString, "UTF-8");
                 if (UtilValidate.isUrl(queryString)
-                        || !SecuredUpload.isValidText(queryString, SecuredUpload.getallowedTokens(), true)
+                        || !SecuredUpload.isValidText(queryString, Collections.emptyList())
                         && isSolrTest()) {
                     Debug.logError("For security reason this URL is not accepted", module);
                     throw new RuntimeException("For security reason this URL is not accepted");
                 }
             }
-            if (!requestUri.matches("/control/logout;jsessionid=[A-Z0-9]{32}\\.jvm1")) {
+
                 try {
                     String url = new URI(((HttpServletRequest) request).getRequestURL().toString())
                             .normalize().toString()
